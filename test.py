@@ -1,14 +1,18 @@
 import websocketClients
 import websocket
+import json
+import orderbook
 
 gdax = websocketClients.GDAXClient()
 
 gdax.connect()
 
-gdax.retrieveOrderBook("BTC-USD")
+snapshot = gdax.retrieveOrderBook("BTC-USD")
+snapshot = json.loads(snapshot)
 
-
-print(gdax.isConnected())
+orderbook.addGDAXSnapshot(snapshot)
 
 gdax.disconnect()
+
+
 

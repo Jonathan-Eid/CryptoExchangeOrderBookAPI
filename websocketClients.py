@@ -2,7 +2,7 @@ import json
 from websocket import create_connection
 
 class gdaxRequest:
-    def __init__(self,type,tickers):
+    def __init__(self, type, tickers):
         self.type = type
         self.tickers = tickers
 
@@ -14,6 +14,22 @@ class gdaxRequest:
                 }
                 """ % (self.type, self.tickers)
         return json.loads(jsonStr)
+
+class bitfenixRequest:
+    def __init__(self, type, tickers):
+        self.type = type
+        self.tickers = tickers.replace("-", "")
+
+    def toJson(self):
+        jsonStr = """
+                {
+                    "event":"%s",
+                    "channel":"book",
+                    "pair":"%s"
+                }
+                """ % (self.type, self.tickers)
+        return json.loads(jsonStr)
+
 
 class Client:
     def __init__(self,url):
@@ -49,10 +65,23 @@ class GDAXClient(Client):
     def retrieveOrderBook(self, tickers):
         if self.connection is not None:
             self.connection.send(json.dumps(gdaxRequest("subscribe", tickers).toJson()))
-            print(self.connection.recv())
-        else:
+            return self.connection.recv()
             print("Connection needs to be established first!")
 
+
+class BitFenixClient(Client):
+    def __init__(self,url="wss://api.bitfinex.com/ws/2"):
+        Client.__init__(self, url)
+        self.url = url
+
+    def retrieveOrderBook(self, tickers):
+        if self.connection is not None:
+            self.connection.send(json.dumps(bitfenixRequest("subscribe", tickers).toJson()))
+            self.connection.recv()
+            self.connection.recv()
+            return self.connection.recv()
+        else:
+            print("Connection needs to be established first!")
 
 
 
