@@ -3,44 +3,30 @@ import websocket
 import json
 from queue import Queue
 import threading
+import orderbook
+import jsonout
 
-#gdax = websocket.create_connection("wss://api.bitfinex.com/ws/2")
-#gdaxorder = websocketClients.bitfenixRequest("subscribe", "BTC-USD").toJson()
-
-boo = True
-q = Queue()
-#gdax.send(json.dumps(gdaxorder))
 gdax = websocketClients.GDAXClient()
 gdax.connect()
-gdax.retrieveOrderBook("BTC-USD")
-t1 = threading.Thread(target=gdax.orderbookUpdates, args=(q,))
-t1.daemon = True
-t1.start()
+bit = websocketClients.BitFenixClient()
+bit.connect()
+orders1 = bit.retrieveOrderBook("BTC-USD")
+orders = gdax.retrieveOrderBook("BTC-USD")
+orderbook.init()
+orderbook.addOrders(orders1)
+orderbook.addOrders(orders)
+gdaxQ = Queue()
+bitQ = Queue()
+getGDAXUpdate = threading.Thread(target=gdax.orderbookUpdates, args=(gdaxQ,))
+getGDAXUpdate.start()
+getBitFinexUpdate = threading.Thread(target=bit.orderbookUpdates, args=(bitQ,))
+getBitFinexUpdate.start()
+orderbookUpdate1 = threading.Thread(target=orderbook.addUpdates, args=(gdaxQ,))
+orderbookUpdate1.start()
+orderbookUpdate2 = threading.Thread(target=orderbook.addUpdates, args=(bitQ,))
+orderbookUpdate2.start()
+orderbook.printBeforeFlush()
 
-def printQ(o):
-    while o:
-        print(q.get())
-        q.task_done()
-
-t2 = threading.Thread(target=printQ, args=(boo, ))
-t2.start()
-gdax.disconnect()
-q.join()
-boo = False
-
-gdax = websocket.create_connection("wss://ws-feed.gdax.com")
-gdaxorder = websocketClients.gdaxRequest("subscribe", "BTC-USD").toJson()
-
-gdax.send(json.dumps(gdaxorder))
-print(gdax.recv())
-print(gdax.recv())
-print(gdax.recv())
-print(gdax.recv())
-print(gdax.recv())
-print(gdax.recv())
-
-
-#gdax.disconnect()
 
 
 

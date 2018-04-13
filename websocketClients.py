@@ -64,14 +64,22 @@ class GDAXClient(Client):
         Client.__init__(self, url)
         self.url = url
 
+    def connect(self):
+        if self.connection is None:
+            self.connection = create_connection(self.url)
+            print("Connected to GDAX!")
+        else:
+            print("Already connected!")
+
     def retrieveOrderBook(self, tickers):
-        if self.isConnected():
+        if self.connection is not None:
             self.connection.send(json.dumps(gdaxRequest("subscribe", tickers).toJson()))
-            return orders.createGDAXOrdersfromSnapshot(json.loads(self.connection.recv()))
+            snapshot = json.loads(self.connection.recv())
+            return orders.createGDAXOrdersfromSnapshot(snapshot)
         else:
             print("Connection needs to be established first!")
 
-    def orderbookUpdates(self,queue):
+    def orderbookUpdates(self, queue):
         if self.isConnected():
             while self.isConnected():
                 update = json.loads(self.connection.recv())
@@ -90,6 +98,13 @@ class BitFenixClient(Client):
         self.url = url
         self.tickers = None
 
+    def connect(self):
+        if self.connection is None:
+            self.connection = create_connection(self.url)
+            print("Connected to BitFenix!")
+        else:
+            print("Already connected!")
+
     def retrieveOrderBook(self, tickers):
         if self.isConnected():
             self.tickers = tickers
@@ -104,9 +119,10 @@ class BitFenixClient(Client):
         if self.isConnected():
             while self.isConnected():
                 update = json.loads(self.connection.recv())
-                if update[1][1] is not 0:
-                    update = orders.createBitFinexOrderfromUpdate(update,self.tickers)
-                    queue.put(update)
+                if not isinstance(update[1],str):
+                    if update[1][1] is not 0:
+                        update = orders.createBitFinexOrderfromUpdate(update,self.tickers)
+                        queue.put(update)
         else:
             print("Connection needs to be established first!")
 

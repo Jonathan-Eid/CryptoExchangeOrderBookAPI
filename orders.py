@@ -9,7 +9,10 @@ class ExchangeOrder:
 def createGDAXOrdersfromSnapshot(snapshot):
     orders = []
     tickers = snapshot['product_id']
+    bidStop = 0
     for order in snapshot["bids"]:
+        if bidStop is 25:
+            break
         gdaxOrder = ExchangeOrder()
         gdaxOrder.pairname = tickers
         gdaxOrder.type = "Bid"
@@ -19,7 +22,13 @@ def createGDAXOrdersfromSnapshot(snapshot):
 
         orders.append(gdaxOrder)
 
+        bidStop += 1
+
+
+    askStop = 0
     for order in snapshot["asks"]:
+        if askStop is 25:
+            break
         gdaxOrder = ExchangeOrder()
         gdaxOrder.pairname = tickers
         gdaxOrder.type = "Ask"
@@ -28,6 +37,8 @@ def createGDAXOrdersfromSnapshot(snapshot):
         gdaxOrder.exchange = "GDAX"
 
         orders.append(gdaxOrder)
+
+        askStop += 1
 
     return orders
 
@@ -51,7 +62,7 @@ def createGDAXOrderfromUpdate(update):
 
 def createBitFinexOrderfromSnapshot(snapshot,tickers):
     orders=[]
-    for order in snapshot[0][1]:
+    for order in snapshot[1]:
         bitfinexOrder = ExchangeOrder()
         bitfinexOrder.pairname = tickers
         bitfinexOrder.price = order[0]
@@ -69,13 +80,15 @@ def createBitFinexOrderfromSnapshot(snapshot,tickers):
 def createBitFinexOrderfromUpdate(update,tickers):
     order = ExchangeOrder()
     order.pairname = tickers
-    if update[0][1][0] < 0:
-        order.price = update[0][1][0] * -1
+    if update[1][2] < 0:
+        order.quantity = update[1][2] * -1
         order.type = "Ask"
     else:
-        order.price = update[0][1][0]
+        order.quantity = update[1][2]
         order.type = "Bid"
-    order.quantity = update[0][1][2]
+
+    order.price = update[1][0]
     order.exchange = "BitFenix"
     return order
+
 
