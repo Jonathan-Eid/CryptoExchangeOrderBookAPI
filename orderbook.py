@@ -67,9 +67,6 @@ def addOrders(orders):
     session.close()
 
 
-
-
-
 def addUpdates(queue):
     session = Session()
     while queue.empty() is False:
@@ -118,3 +115,16 @@ def ordersFromExchange(exch):
         orders.append(o)
 
     return orders
+
+def ordersFromPairname(tickers):
+    orders = []
+    session = Session()
+
+    order = session.query(Order).filter(Order.pairname == tickers)
+    for o in order:
+        orders.append(o)
+
+    return orders
+
+def ordersFromUpdates(queue):
+    return None
