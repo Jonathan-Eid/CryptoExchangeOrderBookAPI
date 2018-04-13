@@ -1,10 +1,8 @@
 from sqlalchemy import create_engine, Column, String, ForeignKey, Table, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-
+from sqlalchemy import exc
 Base = declarative_base()
-
-
 
 class Order(Base):
 
@@ -21,32 +19,52 @@ engine = create_engine("sqlite:///orders.db", echo=True)
 Base.metadata.create_all(bind=engine)
 Session = sessionmaker(bind=engine)
 
-def addGDAXSnapshot(snapshot):
+
+
+
+def addOrder(order,session):
+    try:
+        session.add(order)
+        session.commit()
+    except exc.IntegrityError:
+        session.rollback()
+
+def addOrders(orders):
     session = Session()
-    tickers = snapshot['product_id']
-    for order in snapshot["bids"]:
-        gdaxOrder = Order()
-        gdaxOrder.pairname = tickers
-        gdaxOrder.type = "Bid"
-        gdaxOrder.price = float(order[0])
-        gdaxOrder.quantity = float(order[1])
-        gdaxOrder.exchange = "GDAX"
+    for o in orders:
+        order = Order()
+        order.pairname = o.pairname
+        order.type = o.type
+        order.price = o.price
+        order.quantity = o.quantity
+        order.exchange = o.exchange
 
-        session.add(gdaxOrder)
+        addOrder(order, session)
 
-    for order in snapshot["asks"]:
-        gdaxOrder = Order()
-        gdaxOrder.pairname = tickers
-        gdaxOrder.type = "Ask"
-        gdaxOrder.price = float(order[0])
-        gdaxOrder.quantity = float(order[1])
-        gdaxOrder.exchange = "GDAX"
+    session.close()
 
-        session.add(gdaxOrder)
+def addUpdates(queue):
+    session = Session()
+    while queue.empty() is False:
+        o = queue.get()
+        order = Order()
 
-    session.commit()
+        order.pairname = o.pairname
+        order.type = o.type
+        order.price = o.price
+        order.quantity = o.quantity
+        order.exchange = o.exchange
+
+        addOrder(order, session)
+
     session.close()
 
 
+def printOrders():
+    session = Session()
+    orders = session.query(Order).all()
+    for order in orders:
+        print(order.price)
+    session.close()
 
 
