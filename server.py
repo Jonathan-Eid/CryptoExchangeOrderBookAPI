@@ -1,45 +1,82 @@
 import tornado.ioloop
 import tornado.web
 import tornado.websocket
-import jsonpickle.pickler
+import json
 import orderbook
 import websocketClients
+import jsonout
+import threading
+from queue import Queue
 
-from tornado.options import define, options, parse_command_line
+updateQ = Queue()
 
-
-# we gonna store clients in dictionary..
 gdax = websocketClients.GDAXClient()
-gdax.connect()
 bit = websocketClients.BitFenixClient()
-bit.connect()
-orders1 = bit.retrieveOrderBook("BTC-USD")
-orders = gdax.retrieveOrderBook("BTC-USD")
-orderbook.init()
-orderbook.addOrders(orders1)
-orderbook.addOrders(orders)
+
+def databateInit():
+    gdax.connect()
+    bit.connect()
+    orders1 = bit.retrieveOrderBook("BTC-USD")
+    orders = gdax.retrieveOrderBook("BTC-USD")
+    orderbook.addOrders(orders1)
+    orderbook.addOrders(orders)
 
 class PriceGreaterThanHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
-    def get(self):
+    def initialize(self):
         self.set_header("Content-Type", "application/json")
+    def get(self):
         self.write("This is your response")
         self.finish()
     def post(self):
-        self.write("catch me")
+        data = json.loads(self.request.body.decode('utf-8'))
+        try:
+            write_data = jsonout.priceRequestsToJson(orderbook.ordersGreaterThan(data["greater"]))
+            self.write(write_data)
+        except KeyError:
+            self.write(json.dumps({"error": "invalidRequest"}).encode())
         self.finish()
 
 class ExchangeHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
-    def get(self):
+    def initialize(self):
         self.set_header("Content-Type", "application/json")
+    def get(self):
         self.write("Exchange")
         self.finish()
+    def post(self):
+        data = json.loads(self.request.body.decode('utf-8'))
+        try:
+            write_data = jsonout.exchangeRequestsToJson(orderbook.ordersFromExchange(data["exchange"]))
+            self.write(write_data)
+        except KeyError:
+            self.write(json.dumps({"error": "invalidRequest"}).encode())
+        self.finish()
 
+"""class PairnameHandler(tornado.web.RequestHandler):
+    @tornado.web.asynchronous
+    def initialize(self):
+        self.set_header("Content-Type", "application/json")
+    def get(self):
+        self.write("Pairs")
+        self.finish()
+    def post(self):
+        data = json.loads(self.request.body.decode('utf-8'))
+        try:
+            #pairorder = gdax.retrieveOrderBook(data["pairname"])
+            #orderbook.addOrders(pairorder)
+            pairorder = bit.retrieveOrderBook(data["pairname"])
+            orderbook.addOrders(pairorder)
+
+            write_data = jsonout.pairnameRequestsToJson(orderbook.ordersFromPairname(data["pairname"]))
+            self.write(write_data)
+        except KeyError:
+            self.write(json.dumps({"error": "invalidRequest"}).encode())
+        self.finish()"""
 
 class WebSocketHandler(tornado.websocket.WebSocketHandler):
     def open(self, *args):
-        self.set_header("Content-Type", "application/json")
+        self.write_message(jsonout.ordersToJson(orderbook.snapshotOrders()))
         print("Websocket opened")
 
     def on_message(self, message):
@@ -61,6 +98,7 @@ app = tornado.web.Application([
 ])
 
 if __name__ == '__main__':
-    parse_command_line()
+    databateInit()
     app.listen(8888)
     tornado.ioloop.IOLoop.instance().start()
+

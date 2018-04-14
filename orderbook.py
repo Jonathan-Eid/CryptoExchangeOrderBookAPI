@@ -3,8 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy import exc
 import threading
-
-from sqlalchemy.orm.events import SessionEvents
+from server import updateQ
 
 Base = declarative_base()
 
@@ -20,12 +19,9 @@ class Order(Base):
     instance = Column("instance",String)
 
 
-engine = create_engine("sqlite:///orders.db", echo=True)
+engine = create_engine("sqlite:///orders.db", echo=False)
 Session = sessionmaker(bind=engine)
-
-
-def init():
-    Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 
 def clear_data():
@@ -47,8 +43,10 @@ def updateOrder(order,session):
     try:
         session.add(order)
         session.commit()
+        updateQ.put(order)
     except exc.IntegrityError:
         session.rollback()
+
 
 def addOrders(orders):
     session = Session()
@@ -67,24 +65,21 @@ def addOrders(orders):
     session.close()
 
 
-def addUpdates(queue):
+def addUpdates(o):
     session = Session()
-    while queue.empty() is False:
-        o = queue.get()
-        order = Order()
+    session.autoflush = True
 
-        order.pairname = o.pairname
-        order.type = o.type
-        order.price = o.price
-        order.quantity = o.quantity
-        order.exchange = o.exchange
-        order.instance = "update"
+    order = Order()
 
-        threading.Event().wait(0.1)
+    order.pairname = o.pairname
+    order.type = o.type
+    order.price = o.price
+    order.quantity = o.quantity
+    order.exchange = o.exchange
+    order.instance = "update"
 
-        addOrder(order, session)
+    updateOrder(order, session)
 
-        queue.task_done()
 
 
 def printOrders():
@@ -126,5 +121,13 @@ def ordersFromPairname(tickers):
 
     return orders
 
-def ordersFromUpdates(queue):
-    return None
+def snapshotOrders():
+    orders = []
+    session = Session()
+
+    order = session.query(Order).filter(Order.instance == "snapshot")
+    for o in order:
+        orders.append(o)
+
+    return orders
+

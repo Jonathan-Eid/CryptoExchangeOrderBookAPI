@@ -2,6 +2,8 @@ import json
 from queue import Queue
 from websocket import create_connection
 import orders
+import orderbook
+import threading
 
 class gdaxRequest:
     def __init__(self, type, tickers):
@@ -74,19 +76,22 @@ class GDAXClient(Client):
     def retrieveOrderBook(self, tickers):
         if self.connection is not None:
             self.connection.send(json.dumps(gdaxRequest("subscribe", tickers).toJson()))
-            snapshot = json.loads(self.connection.recv())
-            return orders.createGDAXOrdersfromSnapshot(snapshot)
+            snapshot = orders.createGDAXOrdersfromSnapshot(json.loads(self.connection.recv()))
+            updateThread = threading.Thread(target=self.orderbookUpdates)
+            updateThread.daemon = True
+            updateThread.start()
+            return snapshot
         else:
             print("Connection needs to be established first!")
 
-    def orderbookUpdates(self, queue):
+    def orderbookUpdates(self):
         if self.isConnected():
             while self.isConnected():
                 update = json.loads(self.connection.recv())
                 if update["type"] == 'l2update':
                     if update["changes"][0][2] != "0":
                         update = orders.createGDAXOrderfromUpdate(update)
-                        queue.put(update)
+                        orderbook.addUpdates(update)
 
         else:
             print("Connection needs to be established first!")
@@ -101,7 +106,7 @@ class BitFenixClient(Client):
     def connect(self):
         if self.connection is None:
             self.connection = create_connection(self.url)
-            print("Connected to BitFenix!")
+            print("Connected to BitFinex!")
         else:
             print("Already connected!")
 
@@ -111,18 +116,22 @@ class BitFenixClient(Client):
             self.connection.send(json.dumps(bitfenixRequest("subscribe", tickers).toJson()))
             self.connection.recv()
             self.connection.recv()
-            return orders.createBitFinexOrderfromSnapshot(json.loads(self.connection.recv()), tickers)
+            snapshot = orders.createBitFinexOrderfromSnapshot(json.loads(self.connection.recv()), tickers)
+            updateThread = threading.Thread(target=self.orderbookUpdates)
+            updateThread.daemon = True
+            updateThread.start()
+            return snapshot
         else:
             print("Connection needs to be established first!")
 
-    def orderbookUpdates(self,queue):
+    def orderbookUpdates(self):
         if self.isConnected():
             while self.isConnected():
                 update = json.loads(self.connection.recv())
                 if not isinstance(update[1],str):
                     if update[1][1] is not 0:
                         update = orders.createBitFinexOrderfromUpdate(update,self.tickers)
-                        queue.put(update)
+                        orderbook.addUpdates(update)
         else:
             print("Connection needs to be established first!")
 

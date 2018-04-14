@@ -72,7 +72,7 @@ def createBitFinexOrderfromSnapshot(snapshot,tickers):
         else:
             bitfinexOrder.type = "Bid"
             bitfinexOrder.quantity = order[2]
-        bitfinexOrder.exchange = "BitFenix"
+        bitfinexOrder.exchange = "BitFinex"
 
         orders.append(bitfinexOrder)
     return orders
@@ -88,7 +88,7 @@ def createBitFinexOrderfromUpdate(update,tickers):
         order.type = "Bid"
 
     order.price = update[1][0]
-    order.exchange = "BitFenix"
+    order.exchange = "BitFinex"
     return order
 
 
