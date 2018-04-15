@@ -80,7 +80,7 @@ class GDAXClient(Client):
             updateThread = threading.Thread(target=self.orderbookUpdates)
             updateThread.daemon = True
             updateThread.start()
-            return snapshot
+            orderbook.addOrders(snapshot)
         else:
             print("Connection needs to be established first!")
 
@@ -120,7 +120,7 @@ class BitFenixClient(Client):
             updateThread = threading.Thread(target=self.orderbookUpdates)
             updateThread.daemon = True
             updateThread.start()
-            return snapshot
+            orderbook.addOrders(snapshot)
         else:
             print("Connection needs to be established first!")
 

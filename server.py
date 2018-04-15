@@ -1,83 +1,70 @@
-import tornado.ioloop
+from tornado.ioloop import IOLoop
+from datetime import timedelta
 import tornado.web
 import tornado.websocket
 import json
 import orderbook
+from orderbook import Session
 import websocketClients
 import jsonout
 import threading
-from queue import Queue
 
-updateQ = Queue()
 
-gdax = websocketClients.GDAXClient()
-bit = websocketClients.BitFenixClient()
 
-def databateInit():
+
+
+
+def databaseInit():
+    gdax = websocketClients.GDAXClient()
+    bit = websocketClients.BitFenixClient()
     gdax.connect()
     bit.connect()
-    orders1 = bit.retrieveOrderBook("BTC-USD")
-    orders = gdax.retrieveOrderBook("BTC-USD")
-    orderbook.addOrders(orders1)
-    orderbook.addOrders(orders)
+    bit.retrieveOrderBook("BTC-USD")
+    gdax.retrieveOrderBook("ETH-USD")
 
-class PriceGreaterThanHandler(tornado.web.RequestHandler):
+
+def dataErase():
+    orderbook.clear_data()
+
+class SnapshotHandler(tornado.web.RequestHandler):
     @tornado.web.asynchronous
     def initialize(self):
         self.set_header("Content-Type", "application/json")
     def get(self):
-        self.write("This is your response")
+        self.write(jsonout.ordersToJson(orderbook.snapshotOrders()))
         self.finish()
     def post(self):
         data = json.loads(self.request.body.decode('utf-8'))
         try:
-            write_data = jsonout.priceRequestsToJson(orderbook.ordersGreaterThan(data["greater"]))
-            self.write(write_data)
+            if data["request"] == "greater":
+                write_data = jsonout.priceRequestsToJson(orderbook.ordersGreaterThan(data["number"]))
+                self.write(write_data)
+            if data["request"] == "exchange":
+                write_data = jsonout.exchangeRequestsToJson(orderbook.ordersFromExchange(data["name"]))
+                self.write(write_data)
+            if data["request"] == "pairname":
+                write_data = jsonout.pairnameRequestsToJson(orderbook.ordersFromPairname(data["tickers"]))
+                self.write(write_data)
         except KeyError:
             self.write(json.dumps({"error": "invalidRequest"}).encode())
         self.finish()
-
-class ExchangeHandler(tornado.web.RequestHandler):
-    @tornado.web.asynchronous
-    def initialize(self):
-        self.set_header("Content-Type", "application/json")
-    def get(self):
-        self.write("Exchange")
-        self.finish()
-    def post(self):
-        data = json.loads(self.request.body.decode('utf-8'))
-        try:
-            write_data = jsonout.exchangeRequestsToJson(orderbook.ordersFromExchange(data["exchange"]))
-            self.write(write_data)
-        except KeyError:
-            self.write(json.dumps({"error": "invalidRequest"}).encode())
-        self.finish()
-
-"""class PairnameHandler(tornado.web.RequestHandler):
-    @tornado.web.asynchronous
-    def initialize(self):
-        self.set_header("Content-Type", "application/json")
-    def get(self):
-        self.write("Pairs")
-        self.finish()
-    def post(self):
-        data = json.loads(self.request.body.decode('utf-8'))
-        try:
-            #pairorder = gdax.retrieveOrderBook(data["pairname"])
-            #orderbook.addOrders(pairorder)
-            pairorder = bit.retrieveOrderBook(data["pairname"])
-            orderbook.addOrders(pairorder)
-
-            write_data = jsonout.pairnameRequestsToJson(orderbook.ordersFromPairname(data["pairname"]))
-            self.write(write_data)
-        except KeyError:
-            self.write(json.dumps({"error": "invalidRequest"}).encode())
-        self.finish()"""
 
 class WebSocketHandler(tornado.websocket.WebSocketHandler):
     def open(self, *args):
-        self.write_message(jsonout.ordersToJson(orderbook.snapshotOrders()))
         print("Websocket opened")
+        self.add_header("Content-Type", "application/json")
+        self.write_message(jsonout.ordersToJson(orderbook.snapshotOrders()))
+        self.schedule_update()
+
+    def schedule_update(self):
+        self.timeout = IOLoop.instance().add_timeout(timedelta(seconds=1),
+                                                         self.update_client)
+
+    def update_client(self):
+        try:
+            self.write_message(jsonout.ordersToJson([orderbook.updateQ.get()]))
+        finally:
+            self.schedule_update()
 
     def on_message(self, message):
         """
@@ -92,13 +79,12 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
 
 
 app = tornado.web.Application([
-    (r'/price_greater_than', PriceGreaterThanHandler),
-    (r'/exchange', ExchangeHandler),
+    (r'/snapshot', SnapshotHandler),
     (r'/websocket', WebSocketHandler),
 ])
 
 if __name__ == '__main__':
-    databateInit()
+    databaseInit()
     app.listen(8888)
-    tornado.ioloop.IOLoop.instance().start()
+    IOLoop.instance().start()
 

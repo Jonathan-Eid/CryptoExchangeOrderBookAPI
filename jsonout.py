@@ -9,10 +9,6 @@ class OrdersForJson:
         self.instance = instance
         self.orders.append((order.pairname, order.type, order.price, order.quantity, order.exchange))
 
-class UpdatesForJson:
-    def __init__(self):
-        self.update
-        self.instance
 
 def ordersToJson(orders):
     orderForJson = OrdersForJson()
@@ -21,8 +17,6 @@ def ordersToJson(orders):
 
     return jsonpickle.encode(orderForJson, unpicklable=False)
 
-def updateToJson(update):
-    updateForJson = UpdatesForJson()
 
 
 def priceRequestsToJson(orders):

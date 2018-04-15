@@ -2,9 +2,7 @@ from sqlalchemy import create_engine, Column, String, ForeignKey, Table, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy import exc
-import threading
-from server import updateQ
-
+from queue import Queue
 Base = declarative_base()
 
 class Order(Base):
@@ -23,6 +21,7 @@ engine = create_engine("sqlite:///orders.db", echo=False)
 Session = sessionmaker(bind=engine)
 Base.metadata.create_all(bind=engine)
 
+updateQ = Queue()
 
 def clear_data():
     session = Session()
@@ -30,6 +29,8 @@ def clear_data():
     session.commit()
     session.close()
     Base.metadata.drop_all(bind=engine)
+    with updateQ.mutex:
+        updateQ.queue.clear()
 
 
 def addOrder(order,session):
@@ -43,7 +44,8 @@ def updateOrder(order,session):
     try:
         session.add(order)
         session.commit()
-        updateQ.put(order)
+        update = session.query(Order).get((order.pairname,order.type,order.price,order.quantity,order.exchange))
+        updateQ.put(update)
     except exc.IntegrityError:
         session.rollback()
 
@@ -62,7 +64,6 @@ def addOrders(orders):
 
         addOrder(order, session)
 
-    session.close()
 
 
 def addUpdates(o):
@@ -80,16 +81,6 @@ def addUpdates(o):
 
     updateOrder(order, session)
 
-
-
-def printOrders():
-    num=0
-    session = Session()
-    orders = session.query(Order).all()
-    for order in orders:
-        print(order.pairname,order.type,order.price,order.quantity,order.exchange,num)
-        num+=1
-    session.close()
 
 def ordersGreaterThan(num):
     orders = []
