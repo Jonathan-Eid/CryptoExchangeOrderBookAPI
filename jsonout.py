@@ -10,6 +10,7 @@ class OrdersForJson:
         self.orders.append((order.pairname, order.type, order.price, order.quantity, order.exchange))
 
 
+
 def ordersToJson(orders):
     orderForJson = OrdersForJson()
     for o in orders:

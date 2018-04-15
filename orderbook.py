@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, Column, String, ForeignKey, Table, Float
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, scoped_session
 from sqlalchemy import exc
 from queue import Queue
 Base = declarative_base()
@@ -18,8 +18,9 @@ class Order(Base):
 
 
 engine = create_engine("sqlite:///orders.db", echo=False)
-Session = sessionmaker(bind=engine)
+Session = scoped_session(sessionmaker(bind=engine))
 Base.metadata.create_all(bind=engine)
+
 
 updateQ = Queue()
 
@@ -52,7 +53,6 @@ def updateOrder(order,session):
 
 def addOrders(orders):
     session = Session()
-    session.autoflush = True
     for o in orders:
         order = Order()
         order.pairname = o.pairname
@@ -63,12 +63,11 @@ def addOrders(orders):
         order.instance = "snapshot"
 
         addOrder(order, session)
-
+    Session.remove()
 
 
 def addUpdates(o):
     session = Session()
-    session.autoflush = True
 
     order = Order()
 
@@ -81,6 +80,7 @@ def addUpdates(o):
 
     updateOrder(order, session)
 
+    Session.remove()
 
 def ordersGreaterThan(num):
     orders = []
